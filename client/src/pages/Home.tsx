@@ -178,7 +178,7 @@ export default function Home() {
         )}
       </section>
 
-      {/* Why 1804ht.com */
+      {/* Why 1804ht.com */}
       <section className="bg-muted/30 border-y">
         <div className="max-w-7xl mx-auto px-4 py-14">
           <h2 className="text-xl font-bold text-center mb-10">Pourquoi 1804ht.com ?</h2>
