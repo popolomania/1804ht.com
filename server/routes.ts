@@ -58,6 +58,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // DELETE /api/listings/:id
+  app.delete("/api/listings/:id", async (req, res) => {
+    try {
+      const found = await storage.deleteListing(Number(req.params.id));
+      if (!found) return res.status(404).json({ error: "Listing not found" });
+      res.status(204).send();
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete listing" });
+    }
+  });
+
   // GET /api/saved/:sessionId
   app.get("/api/saved/:sessionId", async (req, res) => {
     try {

@@ -15,6 +15,7 @@ export interface IStorage {
   getListings(filters?: ListingFilters): Promise<Listing[]>;
   getListingById(id: number): Promise<Listing | undefined>;
   createListing(data: InsertListing): Promise<Listing>;
+  deleteListing(id: number): Promise<boolean>; // returns false if not found
   getFeaturedListings(): Promise<Listing[]>;
   getSavedListings(sessionId: string): Promise<Listing[]>;
   saveListing(data: InsertSavedListing): Promise<SavedListing>;
@@ -81,6 +82,11 @@ export const storage: IStorage = {
   async createListing(data: InsertListing): Promise<Listing> {
     const rows = await db.insert(listings).values(data).returning();
     return rows[0];
+  },
+
+  async deleteListing(id: number): Promise<boolean> {
+    const deleted = await db.delete(listings).where(eq(listings.id, id)).returning();
+    return deleted.length > 0;
   },
 
   async getFeaturedListings(): Promise<Listing[]> {
