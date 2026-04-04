@@ -6,6 +6,13 @@
  * CI:     runs automatically before Railway deploy (see .github/workflows/deploy.yml)
  *
  * Test plan:
+ *   PREFLIGHT
+ *     DATABASE_URL is set
+ *     DATABASE_URL has a valid postgresql:// or postgres:// scheme
+ *     DATABASE_URL contains a non-empty host
+ *     Server process stays alive (exit crash detected immediately, not after timeout)
+ *     Server responds with HTTP 200 on /api/listings within 15s (DB reachable)
+ *
  *   READ PATH
  *     GET  /api/listings           → 200, JSON array
  *     GET  /api/listings/featured  → 200, JSON array
@@ -50,6 +57,56 @@ function ok(label, condition, detail = "") {
 function log(msg)  { process.stdout.write(`\n[smoke] ${msg}\n`); }
 function die(msg)  { process.stderr.write(`[smoke] FATAL — ${msg}\n`); process.exit(1); }
 
+// ── DATABASE_URL preflight (before spawning the server) ──────────────────────
+
+function checkDatabaseUrl() {
+  log("PREFLIGHT");
+
+  const url = process.env.DATABASE_URL;
+
+  ok("DATABASE_URL is set", !!url,
+    "export DATABASE_URL=postgresql://user:pass@host:5432/dbname");
+  if (!url) die("DATABASE_URL is required — aborting");
+
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    ok("DATABASE_URL is a valid URL", false, `could not parse: ${url}`);
+    die("DATABASE_URL is not a valid URL");
+  }
+
+  ok("DATABASE_URL is a valid URL", true);
+
+  const validSchemes = ["postgresql:", "postgres:"];
+  ok(
+    `DATABASE_URL scheme is postgresql:// or postgres://`,
+    validSchemes.includes(parsed.protocol),
+    `got '${parsed.protocol}' — must be postgresql:// or postgres://`
+  );
+
+  ok(
+    "DATABASE_URL has a non-empty host",
+    !!parsed.hostname,
+    "host is empty — check the URL format"
+  );
+
+  const port = parsed.port || "5432";
+  ok(
+    `DATABASE_URL port is numeric (${port})`,
+    /^\d+$/.test(port) && Number(port) > 0 && Number(port) < 65536,
+    `got '${port}'`
+  );
+
+  ok(
+    "DATABASE_URL has a database name",
+    parsed.pathname.length > 1,  // more than just '/'
+    `pathname is '${parsed.pathname}' — expected /dbname`
+  );
+
+  if (failed > 0) die("DATABASE_URL preflight failed — fix the connection string before deploying");
+}
+
 async function req(method, path, body) {
   const opts = {
     method,
@@ -67,14 +124,45 @@ async function req(method, path, body) {
 
 // ── wait for server ───────────────────────────────────────────────────────────
 
-async function waitForReady(startedAt) {
+async function waitForReady(startedAt, serverExited) {
   while (Date.now() - startedAt < READY_TIMEOUT) {
+    // If the server process already died, fail immediately with its output
+    // rather than waiting out the full timeout.
+    if (serverExited.code !== null) {
+      die(
+        `Server process exited prematurely (code ${serverExited.code}) — ` +
+        `likely a startup crash. Server output:\n${serverExited.output}`
+      );
+    }
+
     try {
       const r = await fetch(`${BASE}/api/listings`);
-      if (r.status < 500) return;
-    } catch { /* ECONNREFUSED — still booting */ }
+      if (r.status === 200) {
+        // 200 means DB is reachable and the lazy-init connection succeeded
+        ok("Server started and DB connection resolved (lazy init works)", true);
+        return;
+      }
+      if (r.status === 500) {
+        // Server is up but returned 500 — DB is probably unreachable.
+        // Don't treat this as "not ready yet" — read the body and fail fast.
+        const body = await r.json().catch(() => ({}));
+        const hint = body?.error || "unknown error";
+        // Only fail fast if we've been trying for > 3s (give DB a moment to connect)
+        if (Date.now() - startedAt > 3_000) {
+          ok(
+            "Server started and DB connection resolved (lazy init works)",
+            false,
+            `GET /api/listings returned 500: ${hint} — ` +
+            `check DATABASE_URL points to a reachable database`
+          );
+          die("DB connection failed — fix DATABASE_URL before deploying");
+        }
+      }
+    } catch { /* ECONNREFUSED — server not listening yet */ }
     await sleep(POLL_INTERVAL);
   }
+  ok("Server started and DB connection resolved (lazy init works)", false,
+    `timed out after ${READY_TIMEOUT / 1000}s — server never returned HTTP 200`);
   die(`Server did not become ready within ${READY_TIMEOUT / 1000}s`);
 }
 
@@ -193,35 +281,35 @@ async function testSavedPath() {
 
 // ── main ─────────────────────────────────────────────────────────────────────
 
-if (!process.env.DATABASE_URL) {
-  die("DATABASE_URL is not set — export it before running the smoke test");
-}
+// Step 1: validate DATABASE_URL format before touching the server at all
+checkDatabaseUrl();
 
 log(`Booting production build on port ${PORT}…`);
+
+// Step 2: spawn the server, tracking its exit state so waitForReady() can
+// detect a startup crash immediately instead of waiting out the full timeout.
+const serverExited = { code: null, output: "" };
 
 const server = spawn("node", ["dist/index.cjs"], {
   env: { ...process.env, PORT: String(PORT), NODE_ENV: "production" },
   stdio: ["ignore", "pipe", "pipe"],
 });
 
-let serverOutput = "";
-server.stdout.on("data", (d) => { serverOutput += d; });
-server.stderr.on("data", (d) => { serverOutput += d; });
+server.stdout.on("data", (d) => { serverExited.output += d; });
+server.stderr.on("data", (d) => { serverExited.output += d; });
 
 server.on("exit", (code) => {
-  if (code !== null && code !== 0) {
-    process.stderr.write(`[smoke] Server crashed (exit ${code}):\n${serverOutput}\n`);
-    process.exit(1);
-  }
+  serverExited.code = code ?? 0;
 });
 
 function cleanup() { try { server.kill("SIGTERM"); } catch {} }
 process.on("exit", cleanup);
 process.on("SIGINT", () => { cleanup(); process.exit(1); });
 
+// Step 3: wait for first HTTP 200 — this exercises the lazy DB connection
 const startedAt = Date.now();
-await waitForReady(startedAt);
-log(`Server ready in ${Date.now() - startedAt}ms`);
+await waitForReady(startedAt, serverExited);
+log(`Server ready and DB reachable in ${Date.now() - startedAt}ms`);
 
 await testReadPath();
 await testWritePath();
