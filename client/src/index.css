@@ -1,0 +1,159 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Kaye Ayiti — Tropical palette: deep teal ocean + warm sand + vibrant coral accent */
+    --background: 42 30% 97%;
+    --foreground: 210 25% 12%;
+    --card: 42 25% 98%;
+    --card-foreground: 210 25% 12%;
+    --popover: 42 25% 98%;
+    --popover-foreground: 210 25% 12%;
+
+    /* Primary: Deep Caribbean Teal */
+    --primary: 186 72% 28%;
+    --primary-foreground: 42 30% 97%;
+
+    /* Secondary: Warm Sand */
+    --secondary: 38 40% 92%;
+    --secondary-foreground: 210 25% 20%;
+
+    --muted: 38 20% 92%;
+    --muted-foreground: 210 10% 48%;
+
+    /* Accent: Coral/Hibiscus */
+    --accent: 14 85% 55%;
+    --accent-foreground: 42 30% 97%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 42 30% 97%;
+
+    --border: 38 18% 86%;
+    --input: 38 18% 86%;
+    --ring: 186 72% 28%;
+
+    --radius: 0.5rem;
+
+    /* Chart colors */
+    --chart-1: 186 72% 28%;
+    --chart-2: 14 85% 55%;
+    --chart-3: 38 65% 50%;
+    --chart-4: 210 25% 35%;
+    --chart-5: 150 50% 40%;
+
+    /* Sidebar */
+    --sidebar-background: 210 25% 12%;
+    --sidebar-foreground: 42 20% 88%;
+    --sidebar-primary: 186 72% 45%;
+    --sidebar-primary-foreground: 42 30% 97%;
+    --sidebar-accent: 210 20% 20%;
+    --sidebar-accent-foreground: 42 20% 88%;
+    --sidebar-border: 210 20% 20%;
+    --sidebar-ring: 186 72% 45%;
+  }
+
+  .dark {
+    --background: 210 30% 8%;
+    --foreground: 42 20% 90%;
+    --card: 210 28% 11%;
+    --card-foreground: 42 20% 90%;
+    --popover: 210 28% 11%;
+    --popover-foreground: 42 20% 90%;
+
+    --primary: 186 60% 48%;
+    --primary-foreground: 210 30% 8%;
+
+    --secondary: 210 20% 18%;
+    --secondary-foreground: 42 20% 80%;
+
+    --muted: 210 20% 16%;
+    --muted-foreground: 210 10% 55%;
+
+    --accent: 14 80% 58%;
+    --accent-foreground: 210 30% 8%;
+
+    --destructive: 0 62% 55%;
+    --destructive-foreground: 42 20% 90%;
+
+    --border: 210 20% 22%;
+    --input: 210 20% 22%;
+    --ring: 186 60% 48%;
+
+    --chart-1: 186 60% 48%;
+    --chart-2: 14 80% 58%;
+    --chart-3: 38 65% 55%;
+    --chart-4: 210 20% 60%;
+    --chart-5: 150 50% 50%;
+
+    --sidebar-background: 210 30% 6%;
+    --sidebar-foreground: 42 15% 80%;
+    --sidebar-primary: 186 60% 48%;
+    --sidebar-primary-foreground: 210 30% 8%;
+    --sidebar-accent: 210 25% 14%;
+    --sidebar-accent-foreground: 42 15% 80%;
+    --sidebar-border: 210 20% 14%;
+    --sidebar-ring: 186 60% 48%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
+
+/* Listing card hover */
+.listing-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.listing-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+}
+
+/* Hero gradient overlay */
+.hero-overlay {
+  background: linear-gradient(135deg, hsla(186, 72%, 18%, 0.85) 0%, hsla(14, 85%, 35%, 0.4) 100%);
+}
+
+/* Map placeholder */
+.map-container {
+  background: linear-gradient(135deg, hsl(186 30% 85%) 0%, hsl(200 40% 90%) 100%);
+}
+
+/* Image aspect ratio fix */
+.property-image {
+  aspect-ratio: 16/10;
+  object-fit: cover;
+  width: 100%;
+}
+
+/* Price badge */
+.price-badge {
+  background: hsla(186, 72%, 28%, 0.92);
+  backdrop-filter: blur(4px);
+}
+
+/* Search bar */
+.search-hero-bar {
+  box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+}
+
+/* Department badge colors */
+.dept-ouest { background: hsl(186 50% 90%); color: hsl(186 72% 22%); }
+.dept-nord { background: hsl(38 60% 90%); color: hsl(38 65% 30%); }
+.dept-sud { background: hsl(150 40% 88%); color: hsl(150 50% 28%); }
+.dept-artibonite { background: hsl(14 50% 90%); color: hsl(14 65% 35%); }
+.dept-other { background: hsl(260 30% 90%); color: hsl(260 40% 35%); }
