@@ -1,5 +1,8 @@
 # 1804ht.com 🇭🇹
 
+[![CI](https://github.com/popolomania/1804ht.com/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/popolomania/1804ht.com/actions/workflows/ci.yml)
+[![Deploy](https://github.com/popolomania/1804ht.com/actions/workflows/deploy.yml/badge.svg?branch=master)](https://github.com/popolomania/1804ht.com/actions/workflows/deploy.yml)
+
 **1804ht.com** ("Kay Ayiti" — Haitian Creole for "Home Haiti") is a full-stack real estate listing platform for Haiti, modeled after Zillow. Browse, search, filter, and list properties for sale or rent across all ten departments. A Leaflet.js map view plots every listing as a clickable, color-coded pin.
 
 ---
@@ -21,7 +24,7 @@ Deployed on Perplexity Computer — ask the project owner for the link.
 | **Forms** | react-hook-form + zod + @hookform/resolvers |
 | **Map** | Leaflet.js 1.9.4 (dynamically imported, CSS injected at runtime) |
 | **Backend** | Express.js (TypeScript via tsx) |
-| **Database** | SQLite via `better-sqlite3` + Drizzle ORM |
+| **Database** | PostgreSQL via `postgres-js` + Drizzle ORM |
 | **Schema validation** | Drizzle-Zod + Zod |
 | **Build** | Vite (client) + esbuild/tsup (server → `dist/index.cjs`) |
 | **Fonts** | Plus Jakarta Sans (Google Fonts) |
@@ -127,13 +130,13 @@ This starts a single Express server that serves both the static frontend and the
 
 ## Database Schema
 
-Defined in `shared/schema.ts` using Drizzle ORM (SQLite).
+Defined in `shared/schema.ts` using Drizzle ORM (PostgreSQL). Run `npm run db:push` after setting `DATABASE_URL` to apply the schema.
 
 ### `listings`
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | integer PK | Auto-increment |
+| `id` | serial PK | Auto-increment |
 | `title` | text | Listing headline |
 | `description` | text | Full description |
 | `price` | real | USD |
@@ -150,7 +153,7 @@ Defined in `shared/schema.ts` using Drizzle ORM (SQLite).
 | `images` | text | JSON array of image URLs |
 | `amenities` | text | JSON array of strings |
 | `status` | text | `"active"`, `"sold"`, `"pending"` |
-| `featured` | integer (boolean) | Shown in "Coups de coeur" |
+| `featured` | boolean | Shown in "Coups de coeur" |
 | `contact_name` | text | |
 | `contact_phone` | text | |
 | `contact_email` | text | nullable |
@@ -159,7 +162,7 @@ Defined in `shared/schema.ts` using Drizzle ORM (SQLite).
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | integer PK | |
+| `id` | serial PK | |
 | `listing_id` | integer | FK → `listings.id` |
 | `session_id` | text | In-memory session ID (no auth required) |
 
@@ -235,7 +238,7 @@ The database is seeded automatically on first boot via `storage.seedIfEmpty()` (
 | 9 | Villa avec Piscine – Laboule | Pétion-Ville | Ouest | Villa | $750,000 |
 | 10 | Appartement 2 Chambres – Turgeau | Port-au-Prince | Ouest | Apartment | $1,100/mo |
 
-To re-seed from scratch: delete `database.sqlite` and restart the server.
+To re-seed from scratch: truncate the `listings` table in PostgreSQL and restart the server.
 
 ---
 
