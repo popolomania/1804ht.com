@@ -14,12 +14,15 @@ import Footer from "@/components/Footer";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 export default function App() {
+  // Embed mode: hide navbar/footer when loaded via iframe with ?embed=1
+  const isEmbed = new URLSearchParams(window.location.search).get("embed") === "1";
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <Router hook={useHashLocation}>
           <div className="min-h-screen flex flex-col bg-background text-foreground">
-            <Navbar />
+            {!isEmbed && <Navbar />}
             <main className="flex-1">
               <Switch>
                 <Route path="/" component={Home} />
@@ -30,7 +33,7 @@ export default function App() {
                 <Route component={NotFound} />
               </Switch>
             </main>
-            <Footer />
+            {!isEmbed && <Footer />}
           </div>
         </Router>
         <Toaster />

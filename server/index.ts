@@ -6,6 +6,16 @@ import { createServer } from "http";
 const app = express();
 const httpServer = createServer(app);
 
+// CORS – allow Squarespace and any domain to embed & call the API
+app.use((_req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  // Allow iframe embedding from any origin (for Squarespace)
+  res.removeHeader("X-Frame-Options");
+  next();
+});
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
