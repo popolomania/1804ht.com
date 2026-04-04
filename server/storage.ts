@@ -1,55 +1,26 @@
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
-import { eq, and, like, gte, lte, sql, or } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { eq, and, sql } from "drizzle-orm";
 import { listings, savedListings } from "@shared/schema";
 import type { Listing, InsertListing, SavedListing, InsertSavedListing } from "@shared/schema";
 
-const sqlite = new Database("database.sqlite");
-const db = drizzle(sqlite);
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL environment variable is required");
+}
 
-// Create tables if not exist
-sqlite.exec(`
-  CREATE TABLE IF NOT EXISTS listings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    description TEXT NOT NULL,
-    price REAL NOT NULL,
-    price_type TEXT NOT NULL DEFAULT 'sale',
-    address TEXT NOT NULL,
-    city TEXT NOT NULL,
-    department TEXT NOT NULL,
-    property_type TEXT NOT NULL,
-    bedrooms INTEGER,
-    bathrooms INTEGER,
-    area_sqm REAL,
-    lat REAL,
-    lng REAL,
-    images TEXT NOT NULL DEFAULT '[]',
-    amenities TEXT NOT NULL DEFAULT '[]',
-    status TEXT NOT NULL DEFAULT 'active',
-    featured INTEGER DEFAULT 0,
-    contact_name TEXT NOT NULL,
-    contact_phone TEXT NOT NULL,
-    contact_email TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS saved_listings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    listing_id INTEGER NOT NULL,
-    session_id TEXT NOT NULL
-  );
-`);
+const client = postgres(process.env.DATABASE_URL);
+const db = drizzle(client);
 
 export interface IStorage {
-  getListings(filters?: ListingFilters): Listing[];
-  getListingById(id: number): Listing | undefined;
-  createListing(data: InsertListing): Listing;
-  getFeaturedListings(): Listing[];
-  getSavedListings(sessionId: string): Listing[];
-  saveListing(data: InsertSavedListing): SavedListing;
-  unsaveListing(listingId: number, sessionId: string): void;
-  isSaved(listingId: number, sessionId: string): boolean;
-  seedIfEmpty(): void;
+  getListings(filters?: ListingFilters): Promise<Listing[]>;
+  getListingById(id: number): Promise<Listing | undefined>;
+  createListing(data: InsertListing): Promise<Listing>;
+  getFeaturedListings(): Promise<Listing[]>;
+  getSavedListings(sessionId: string): Promise<Listing[]>;
+  saveListing(data: InsertSavedListing): Promise<SavedListing>;
+  unsaveListing(listingId: number, sessionId: string): Promise<void>;
+  isSaved(listingId: number, sessionId: string): Promise<boolean>;
+  seedIfEmpty(): Promise<void>;
 }
 
 export interface ListingFilters {
@@ -64,12 +35,9 @@ export interface ListingFilters {
 }
 
 export const storage: IStorage = {
-  getListings(filters?: ListingFilters): Listing[] {
-    let query = db.select().from(listings).where(eq(listings.status, "active"));
-    const rows = db.select().from(listings).all() as Listing[];
-    
-    let results = rows.filter(l => l.status === "active");
-    
+  async getListings(filters?: ListingFilters): Promise<Listing[]> {
+    let results = await db.select().from(listings).where(eq(listings.status, "active"));
+
     if (filters?.search) {
       const s = filters.search.toLowerCase();
       results = results.filter(l =>
@@ -101,55 +69,57 @@ export const storage: IStorage = {
     if (filters?.bedrooms !== undefined) {
       results = results.filter(l => (l.bedrooms ?? 0) >= filters.bedrooms!);
     }
-    
+
     return results;
   },
 
-  getListingById(id: number): Listing | undefined {
-    return db.select().from(listings).where(eq(listings.id, id)).get() as Listing | undefined;
+  async getListingById(id: number): Promise<Listing | undefined> {
+    const rows = await db.select().from(listings).where(eq(listings.id, id));
+    return rows[0];
   },
 
-  createListing(data: InsertListing): Listing {
-    return db.insert(listings).values(data).returning().get() as Listing;
+  async createListing(data: InsertListing): Promise<Listing> {
+    const rows = await db.insert(listings).values(data).returning();
+    return rows[0];
   },
 
-  getFeaturedListings(): Listing[] {
+  async getFeaturedListings(): Promise<Listing[]> {
     return db.select().from(listings)
-      .where(and(eq(listings.featured, true), eq(listings.status, "active")))
-      .all() as Listing[];
+      .where(and(eq(listings.featured, true), eq(listings.status, "active")));
   },
 
-  getSavedListings(sessionId: string): Listing[] {
-    const saved = db.select().from(savedListings)
-      .where(eq(savedListings.sessionId, sessionId))
-      .all() as SavedListing[];
-    
+  async getSavedListings(sessionId: string): Promise<Listing[]> {
+    const saved = await db.select().from(savedListings)
+      .where(eq(savedListings.sessionId, sessionId));
+
     const ids = saved.map(s => s.listingId);
     if (ids.length === 0) return [];
-    
-    return ids.map(id => db.select().from(listings).where(eq(listings.id, id)).get()).filter(Boolean) as Listing[];
+
+    const results = await Promise.all(
+      ids.map(id => db.select().from(listings).where(eq(listings.id, id)))
+    );
+    return results.flat().filter(Boolean);
   },
 
-  saveListing(data: InsertSavedListing): SavedListing {
-    return db.insert(savedListings).values(data).returning().get() as SavedListing;
+  async saveListing(data: InsertSavedListing): Promise<SavedListing> {
+    const rows = await db.insert(savedListings).values(data).returning();
+    return rows[0];
   },
 
-  unsaveListing(listingId: number, sessionId: string): void {
-    db.delete(savedListings)
-      .where(and(eq(savedListings.listingId, listingId), eq(savedListings.sessionId, sessionId)))
-      .run();
+  async unsaveListing(listingId: number, sessionId: string): Promise<void> {
+    await db.delete(savedListings)
+      .where(and(eq(savedListings.listingId, listingId), eq(savedListings.sessionId, sessionId)));
   },
 
-  isSaved(listingId: number, sessionId: string): boolean {
-    const row = db.select().from(savedListings)
-      .where(and(eq(savedListings.listingId, listingId), eq(savedListings.sessionId, sessionId)))
-      .get();
-    return !!row;
+  async isSaved(listingId: number, sessionId: string): Promise<boolean> {
+    const rows = await db.select().from(savedListings)
+      .where(and(eq(savedListings.listingId, listingId), eq(savedListings.sessionId, sessionId)));
+    return rows.length > 0;
   },
 
-  seedIfEmpty(): void {
-    const count = db.select({ count: sql<number>`count(*)` }).from(listings).get() as { count: number };
-    if (count.count > 0) return;
+  async seedIfEmpty(): Promise<void> {
+    const countResult = await db.select({ count: sql<number>`count(*)` }).from(listings);
+    if (Number(countResult[0].count) > 0) return;
 
     const seedData: InsertListing[] = [
       {
@@ -407,7 +377,7 @@ export const storage: IStorage = {
     ];
 
     for (const item of seedData) {
-      db.insert(listings).values(item).run();
+      await db.insert(listings).values(item);
     }
   }
 };

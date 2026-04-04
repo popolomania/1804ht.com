@@ -1,9 +1,9 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, real, boolean, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const listings = sqliteTable("listings", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const listings = pgTable("listings", {
+  id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description").notNull(),
   price: real("price").notNull(),
@@ -20,14 +20,14 @@ export const listings = sqliteTable("listings", {
   images: text("images").notNull().default("[]"), // JSON array of image URLs
   amenities: text("amenities").notNull().default("[]"), // JSON array
   status: text("status").notNull().default("active"), // "active" | "sold" | "pending"
-  featured: integer("featured", { mode: "boolean" }).default(false),
+  featured: boolean("featured").default(false),
   contactName: text("contact_name").notNull(),
   contactPhone: text("contact_phone").notNull(),
   contactEmail: text("contact_email"),
 });
 
-export const savedListings = sqliteTable("saved_listings", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const savedListings = pgTable("saved_listings", {
+  id: serial("id").primaryKey(),
   listingId: integer("listing_id").notNull(),
   sessionId: text("session_id").notNull(),
 });
