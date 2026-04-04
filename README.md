@@ -1,6 +1,6 @@
-# Kaye Ayiti 🇭🇹
+# 1804ht.com 🇭🇹
 
-**Kaye Ayiti** ("Kay Ayiti" — Haitian Creole for "Home Haiti") is a full-stack real estate listing platform for Haiti, modeled after Zillow. Browse, search, filter, and list properties for sale or rent across all ten departments. A Leaflet.js map view plots every listing as a clickable, color-coded pin.
+**1804ht.com** ("Kay Ayiti" — Haitian Creole for "Home Haiti") is a full-stack real estate listing platform for Haiti, modeled after Zillow. Browse, search, filter, and list properties for sale or rent across all ten departments. A Leaflet.js map view plots every listing as a clickable, color-coded pin.
 
 ---
 
@@ -31,7 +31,7 @@ Deployed on Perplexity Computer — ask the project owner for the link.
 ## Project Structure
 
 ```
-kaye-ayiti/
+1804ht.com/
 ├── client/
 │   ├── index.html
 │   └── src/
@@ -80,8 +80,8 @@ kaye-ayiti/
 ### Install & Run (development)
 
 ```bash
-git clone https://github.com/popolomania/kaye-ayiti.git
-cd kaye-ayiti
+git clone https://github.com/popolomania/1804ht.com.git
+cd 1804ht.com
 npm install
 npm run dev
 ```

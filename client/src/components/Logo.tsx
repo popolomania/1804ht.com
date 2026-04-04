@@ -2,7 +2,7 @@ export default function Logo() {
   return (
     <div className="flex items-center gap-2">
       <svg
-        aria-label="Kaye Ayiti"
+        aria-label="1804ht.com"
         viewBox="0 0 36 36"
         width="36"
         height="36"
@@ -21,7 +21,7 @@ export default function Logo() {
         <rect x="23" y="18" width="4" height="4" rx="0.5" fill="hsl(186 72% 28%)" />
       </svg>
       <div className="flex flex-col leading-none">
-        <span className="font-bold text-base text-foreground tracking-tight">Kaye Ayiti</span>
+        <span className="font-bold text-base text-foreground tracking-tight">1804ht.com</span>
         <span className="text-xs text-muted-foreground font-normal">Immobilier</span>
       </div>
     </div>

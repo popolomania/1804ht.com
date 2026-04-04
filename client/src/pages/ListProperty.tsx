@@ -86,7 +86,7 @@ export default function ListProperty() {
         </div>
         <h1 className="text-xl font-bold mb-2">Annonce publiée avec succès !</h1>
         <p className="text-muted-foreground text-sm mb-8">
-          Votre propriété est maintenant visible sur Kaye Ayiti. Les acheteurs et locataires intéressés vous contacteront directement.
+          Votre propriété est maintenant visible sur 1804ht.com. Les acheteurs et locataires intéressés vous contacteront directement.
         </p>
         <div className="flex gap-3 justify-center">
           <Button variant="outline" onClick={() => { setSubmitted(false); form.reset(); }}>

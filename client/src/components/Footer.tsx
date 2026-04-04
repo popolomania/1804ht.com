@@ -32,7 +32,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="mt-8 pt-6 border-t flex flex-wrap gap-4 justify-between items-center text-xs text-muted-foreground">
-          <span>© 2026 Kaye Ayiti. Tous droits réservés.</span>
+          <span>© 2026 1804ht.com. Tous droits réservés.</span>
           <div className="flex gap-4">
             <span>Haïti 🇭🇹</span>
             <span>Français | Kreyòl</span>

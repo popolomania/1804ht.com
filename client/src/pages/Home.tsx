@@ -70,12 +70,12 @@ export default function Home() {
         <div className="relative z-10 max-w-4xl mx-auto px-4 py-20 w-full">
           <div className="flex items-center gap-2 mb-3">
             <span className="bg-white/20 backdrop-blur text-white text-xs font-medium px-3 py-1 rounded-full border border-white/30">
-              🇭🇹 La plateforme immobilière d'Haïti
+              🇭🇹 1804ht.com — L'immobilier haïtien
             </span>
           </div>
           <h1 className="text-white font-bold text-4xl md:text-5xl leading-tight mb-3">
             Trouvez votre<br />
-            <span className="text-yellow-300">Kaye</span> en Haïti
+            <span className="text-yellow-300">maison</span> en Haïti
           </h1>
           <p className="text-white/80 text-lg mb-8 max-w-xl">
             Maisons, appartements, terrains et villas dans toutes les régions du pays.
@@ -178,10 +178,10 @@ export default function Home() {
         )}
       </section>
 
-      {/* Why Kaye Ayiti */}
+      {/* Why 1804ht.com */
       <section className="bg-muted/30 border-y">
         <div className="max-w-7xl mx-auto px-4 py-14">
-          <h2 className="text-xl font-bold text-center mb-10">Pourquoi Kaye Ayiti ?</h2>
+          <h2 className="text-xl font-bold text-center mb-10">Pourquoi 1804ht.com ?</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
               {
