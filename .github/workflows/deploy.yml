@@ -6,13 +6,49 @@ on:
       - master
 
 jobs:
-  deploy:
-    name: Deploy
+  smoke-and-deploy:
+    name: Smoke Test & Deploy
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test1804ht
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/test1804ht
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Push schema to test DB
+        run: npm run db:push
+
+      - name: Smoke test
+        run: npm run smoke
 
       - name: Deploy to Railway
         uses: railwayapp/deploy-action@v1
