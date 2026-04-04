@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
+import { storage } from "./storage";
 import { createServer } from "http";
 
 const app = express();
@@ -108,6 +109,12 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      // Seed after the server is listening so DATABASE_URL is guaranteed
+      // to be available (Railway/Render inject env vars before starting the process,
+      // but we defer anyway to keep startup non-blocking)
+      storage.seedIfEmpty().catch((err) => {
+        console.error("Seed failed (non-fatal):", err.message);
+      });
     },
   );
 })();

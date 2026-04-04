@@ -4,12 +4,20 @@ import { eq, and, sql } from "drizzle-orm";
 import { listings, savedListings } from "@shared/schema";
 import type { Listing, InsertListing, SavedListing, InsertSavedListing } from "@shared/schema";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is required");
+function getDb() {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL environment variable is required");
+  const client = postgres(url);
+  return drizzle(client);
 }
 
-const client = postgres(process.env.DATABASE_URL);
-const db = drizzle(client);
+// Lazily initialized — connection is deferred until the first query,
+// so the process can start even if DATABASE_URL is injected after module load.
+let _db: ReturnType<typeof drizzle> | null = null;
+function db(): ReturnType<typeof drizzle> {
+  if (!_db) _db = getDb();
+  return _db;
+}
 
 export interface IStorage {
   getListings(filters?: ListingFilters): Promise<Listing[]>;
@@ -37,7 +45,7 @@ export interface ListingFilters {
 
 export const storage: IStorage = {
   async getListings(filters?: ListingFilters): Promise<Listing[]> {
-    let results = await db.select().from(listings).where(eq(listings.status, "active"));
+    let results = await db().select().from(listings).where(eq(listings.status, "active"));
 
     if (filters?.search) {
       const s = filters.search.toLowerCase();
@@ -75,27 +83,27 @@ export const storage: IStorage = {
   },
 
   async getListingById(id: number): Promise<Listing | undefined> {
-    const rows = await db.select().from(listings).where(eq(listings.id, id));
+    const rows = await db().select().from(listings).where(eq(listings.id, id));
     return rows[0];
   },
 
   async createListing(data: InsertListing): Promise<Listing> {
-    const rows = await db.insert(listings).values(data).returning();
+    const rows = await db().insert(listings).values(data).returning();
     return rows[0];
   },
 
   async deleteListing(id: number): Promise<boolean> {
-    const deleted = await db.delete(listings).where(eq(listings.id, id)).returning();
+    const deleted = await db().delete(listings).where(eq(listings.id, id)).returning();
     return deleted.length > 0;
   },
 
   async getFeaturedListings(): Promise<Listing[]> {
-    return db.select().from(listings)
+    return db().select().from(listings)
       .where(and(eq(listings.featured, true), eq(listings.status, "active")));
   },
 
   async getSavedListings(sessionId: string): Promise<Listing[]> {
-    const saved = await db.select().from(savedListings)
+    const saved = await db().select().from(savedListings)
       .where(eq(savedListings.sessionId, sessionId));
 
     const ids = saved.map(s => s.listingId);
@@ -108,23 +116,23 @@ export const storage: IStorage = {
   },
 
   async saveListing(data: InsertSavedListing): Promise<SavedListing> {
-    const rows = await db.insert(savedListings).values(data).returning();
+    const rows = await db().insert(savedListings).values(data).returning();
     return rows[0];
   },
 
   async unsaveListing(listingId: number, sessionId: string): Promise<void> {
-    await db.delete(savedListings)
+    await db().delete(savedListings)
       .where(and(eq(savedListings.listingId, listingId), eq(savedListings.sessionId, sessionId)));
   },
 
   async isSaved(listingId: number, sessionId: string): Promise<boolean> {
-    const rows = await db.select().from(savedListings)
+    const rows = await db().select().from(savedListings)
       .where(and(eq(savedListings.listingId, listingId), eq(savedListings.sessionId, sessionId)));
     return rows.length > 0;
   },
 
   async seedIfEmpty(): Promise<void> {
-    const countResult = await db.select({ count: sql<number>`count(*)` }).from(listings);
+    const countResult = await db().select({ count: sql<number>`count(*)` }).from(listings);
     if (Number(countResult[0].count) > 0) return;
 
     const seedData: InsertListing[] = [
@@ -383,7 +391,7 @@ export const storage: IStorage = {
     ];
 
     for (const item of seedData) {
-      await db.insert(listings).values(item);
+      await db().insert(listings).values(item);
     }
   }
 };
