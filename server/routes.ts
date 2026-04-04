@@ -3,7 +3,7 @@ import { Server } from "http";
 import { storage } from "./storage";
 import { insertListingSchema, insertSavedListingSchema } from "@shared/schema";
 
-export function registerRoutes(httpServer: Server, app: Express) {
+export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
   // Seed database on startup (async, fire-and-forget)
   storage.seedIfEmpty().catch(console.error);
 

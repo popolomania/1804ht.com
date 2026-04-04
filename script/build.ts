@@ -22,6 +22,7 @@ const allowlist = [
   "openai",
   "passport",
   "passport-local",
+  "postgres",
   "stripe",
   "uuid",
   "ws",
@@ -56,6 +57,9 @@ async function buildAll() {
     minify: true,
     external: externals,
     logLevel: "info",
+    alias: {
+      "@shared": "./shared",
+    },
   });
 }
 
