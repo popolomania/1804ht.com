@@ -53,6 +53,11 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://test:test@localhost:5432/test1804ht
+      # Bootstrap a test admin so admin-dependent smoke checks run in CI.
+      # These are safe throwaway values — only used against the ephemeral
+      # Postgres service container, never against production.
+      ADMIN_EMAIL:    smoke-admin@test.invalid
+      ADMIN_PASSWORD: SmokeAdminPass123
 
     steps:
       - name: Checkout
@@ -73,7 +78,7 @@ jobs:
       - name: Run migration (db:push) against test DB
         run: npm run migrate
 
-      - name: Smoke test
+      - name: Smoke test (includes agent approval flow)
         run: npm run smoke
 
   # ── Job 3: trigger Render deploy ─────────────────────────────────────────
