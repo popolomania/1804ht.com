@@ -1,7 +1,36 @@
-import { pgTable, text, integer, real, boolean, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, boolean, serial, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// ── Users ────────────────────────────────────────────────────────────────────
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  // "guest" = browse only, "agent" = can list/edit/delete own listings
+  role: text("role").notNull().default("guest"),
+  phone: text("phone"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, passwordHash: true, createdAt: true });
+export const registerSchema = z.object({
+  name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
+  email: z.string().email("Adresse email invalide"),
+  password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
+  role: z.enum(["guest", "agent"]).default("guest"),
+  phone: z.string().optional(),
+});
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+// ── Listings ──────────────────────────────────────────────────────────────────
 export const listings = pgTable("listings", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
@@ -24,6 +53,7 @@ export const listings = pgTable("listings", {
   contactName: text("contact_name").notNull(),
   contactPhone: text("contact_phone").notNull(),
   contactEmail: text("contact_email"),
+  ownerId: integer("owner_id"), // FK → users.id (null for seed/legacy listings)
 });
 
 export const savedListings = pgTable("saved_listings", {
@@ -33,6 +63,7 @@ export const savedListings = pgTable("saved_listings", {
 });
 
 export const insertListingSchema = createInsertSchema(listings).omit({ id: true });
+export const updateListingSchema = insertListingSchema.partial();
 export const insertSavedListingSchema = createInsertSchema(savedListings).omit({ id: true });
 
 export type Listing = typeof listings.$inferSelect;

@@ -118,11 +118,9 @@ export async function apiRequest(
 
 // ---- getQueryFn for TanStack Query defaultOptions ----
 type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
-  on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
+export function getQueryFn<T>(options: { on401: UnauthorizedBehavior }): QueryFunction<T> {
+  const { on401: unauthorizedBehavior } = options;
+  return async ({ queryKey }) => {
     // queryKey[0] is the path, queryKey[1] may be a query string for /api/listings
     const basePath = queryKey[0] as string;
     const extra = queryKey[1];
@@ -138,7 +136,7 @@ export const getQueryFn: <T>(options: {
     const res = handleApiRequest("GET", url);
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+      return null as unknown as T;
     }
 
     if (!res.ok) {
@@ -146,8 +144,9 @@ export const getQueryFn: <T>(options: {
       throw new Error(`${res.status}: ${text}`);
     }
 
-    return await res.json();
+    return (await res.json()) as T;
   };
+}
 
 export const queryClient = new QueryClient({
   defaultOptions: {

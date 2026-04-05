@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { storage } from "./storage";
 import { createServer } from "http";
+import { setupAuth, registerAuthRoutes } from "./auth";
 
 const app = express();
 const httpServer = createServer(app);
@@ -32,6 +33,10 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+// Auth (session + passport) — must come after body parsers
+setupAuth(app);
+registerAuthRoutes(app);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

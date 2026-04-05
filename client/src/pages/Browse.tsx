@@ -63,15 +63,15 @@ export default function Browse() {
 
   const { data: listings, isLoading } = useQuery<Listing[]>({
     queryKey: ["/api/listings", queryString],
-    queryFn: async () => {
+    queryFn: async (): Promise<Listing[]> => {
       const res = await apiRequest("GET", `/api/listings?${queryString}`);
-      return res.json();
+      return res.json() as Promise<Listing[]>;
     },
   });
 
   const { data: saved } = useQuery<Listing[]>({
     queryKey: ["/api/saved", sessionId],
-    queryFn: () => apiRequest("GET", `/api/saved/${sessionId}`).then(r => r.json()),
+    queryFn: (): Promise<Listing[]> => apiRequest("GET", `/api/saved/${sessionId}`).then(r => r.json() as Promise<Listing[]>),
   });
   const savedIds = (saved ?? []).map((l: Listing) => l.id);
 

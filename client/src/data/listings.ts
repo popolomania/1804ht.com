@@ -26,7 +26,8 @@ export const staticListings: Listing[] = [
     featured: true,
     contactName: "Maison Caraïbe Immobilier",
     contactPhone: "+509 3612-0000",
-    contactEmail: "info@maisoncaraibe.ht"
+    contactEmail: "info@maisoncaraibe.ht",
+      ownerId: null
   },
   {
     id: 2,
@@ -52,7 +53,8 @@ export const staticListings: Listing[] = [
     featured: true,
     contactName: "Agence Lakay",
     contactPhone: "+509 3700-1234",
-    contactEmail: "contact@agencylakay.ht"
+    contactEmail: "contact@agencylakay.ht",
+      ownerId: null
   },
   {
     id: 3,
@@ -78,7 +80,8 @@ export const staticListings: Listing[] = [
     featured: true,
     contactName: "Nord Immo",
     contactPhone: "+509 3888-5566",
-    contactEmail: "nordimmo@gmail.com"
+    contactEmail: "nordimmo@gmail.com",
+      ownerId: null
   },
   {
     id: 4,
@@ -104,7 +107,8 @@ export const staticListings: Listing[] = [
     featured: false,
     contactName: "Famille Dupont",
     contactPhone: "+509 3422-7788",
-    contactEmail: null
+    contactEmail: null,
+      ownerId: null
   },
   {
     id: 5,
@@ -130,7 +134,8 @@ export const staticListings: Listing[] = [
     featured: false,
     contactName: "Cap Invest",
     contactPhone: "+509 3600-2200",
-    contactEmail: "capinvest@outlook.com"
+    contactEmail: "capinvest@outlook.com",
+      ownerId: null
   },
   {
     id: 6,
@@ -156,7 +161,8 @@ export const staticListings: Listing[] = [
     featured: true,
     contactName: "Jacmel Patrimoine",
     contactPhone: "+509 3744-9900",
-    contactEmail: "info@jacmelpatrimoine.ht"
+    contactEmail: "info@jacmelpatrimoine.ht",
+      ownerId: null
   },
   {
     id: 7,
@@ -182,7 +188,8 @@ export const staticListings: Listing[] = [
     featured: false,
     contactName: "PV Rentals",
     contactPhone: "+509 3811-4455",
-    contactEmail: "pvrentals@gmail.com"
+    contactEmail: "pvrentals@gmail.com",
+      ownerId: null
   },
   {
     id: 8,
@@ -208,7 +215,8 @@ export const staticListings: Listing[] = [
     featured: false,
     contactName: "Agro Haïti",
     contactPhone: "+509 3500-7788",
-    contactEmail: "agrohaiti@gmail.com"
+    contactEmail: "agrohaiti@gmail.com",
+      ownerId: null
   },
   {
     id: 9,
@@ -235,7 +243,8 @@ export const staticListings: Listing[] = [
     featured: true,
     contactName: "Prestige Immobilier Haiti",
     contactPhone: "+509 3900-0001",
-    contactEmail: "prestige@immo-haiti.ht"
+    contactEmail: "prestige@immo-haiti.ht",
+      ownerId: null
   },
   {
     id: 10,
@@ -261,6 +270,7 @@ export const staticListings: Listing[] = [
     featured: false,
     contactName: "Madame Pierre",
     contactPhone: "+509 3644-2211",
-    contactEmail: null
+    contactEmail: null,
+      ownerId: null
   }
 ];

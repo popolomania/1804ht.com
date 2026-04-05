@@ -1,23 +1,7 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 import { eq, and, sql } from "drizzle-orm";
 import { listings, savedListings } from "@shared/schema";
 import type { Listing, InsertListing, SavedListing, InsertSavedListing } from "@shared/schema";
-
-function getDb() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL environment variable is required");
-  const client = postgres(url);
-  return drizzle(client);
-}
-
-// Lazily initialized — connection is deferred until the first query,
-// so the process can start even if DATABASE_URL is injected after module load.
-let _db: ReturnType<typeof drizzle> | null = null;
-function db(): ReturnType<typeof drizzle> {
-  if (!_db) _db = getDb();
-  return _db;
-}
+import { db } from "./db";
 
 export interface IStorage {
   getListings(filters?: ListingFilters): Promise<Listing[]>;
@@ -110,7 +94,7 @@ export const storage: IStorage = {
     if (ids.length === 0) return [];
 
     const results = await Promise.all(
-      ids.map(id => db.select().from(listings).where(eq(listings.id, id)))
+      ids.map(id => db().select().from(listings).where(eq(listings.id, id)))
     );
     return results.flat().filter(Boolean);
   },

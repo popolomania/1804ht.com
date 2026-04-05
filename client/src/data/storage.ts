@@ -91,6 +91,7 @@ export function createListing(data: InsertListing): Listing {
     contactName: data.contactName,
     contactPhone: data.contactPhone,
     contactEmail: data.contactEmail ?? null,
+    ownerId: data.ownerId ?? null,
   };
   listingsStore.push(listing);
   return listing;

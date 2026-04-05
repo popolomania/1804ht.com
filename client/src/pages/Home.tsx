@@ -27,9 +27,8 @@ export default function Home() {
 
   const { data: saved } = useQuery<Listing[]>({
     queryKey: ["/api/saved", sessionId],
-    queryFn: async () => {
-      
-      return apiRequest("GET", `/api/saved/${sessionId}`).then(r => r.json());
+    queryFn: async (): Promise<Listing[]> => {
+      return apiRequest("GET", `/api/saved/${sessionId}`).then(r => r.json() as Promise<Listing[]>);
     },
   });
   const savedIds = (saved ?? []).map((l: Listing) => l.id);

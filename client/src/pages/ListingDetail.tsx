@@ -30,17 +30,17 @@ export default function ListingDetail() {
 
   const { data: listing, isLoading } = useQuery<Listing>({
     queryKey: ["/api/listings", params.id],
-    queryFn: async () => {
+    queryFn: async (): Promise<Listing> => {
       const res = await apiRequest("GET", `/api/listings/${params.id}`);
-      return res.json();
+      return res.json() as Promise<Listing>;
     },
   });
 
-  const { data: savedStatus } = useQuery({
+  const { data: savedStatus } = useQuery<{ saved: boolean }>({
     queryKey: ["/api/saved", sessionId, params.id, "status"],
-    queryFn: async () => {
+    queryFn: async (): Promise<{ saved: boolean }> => {
       const res = await apiRequest("GET", `/api/saved/${sessionId}/${params.id}/status`);
-      return res.json();
+      return res.json() as Promise<{ saved: boolean }>;
     },
   });
 
