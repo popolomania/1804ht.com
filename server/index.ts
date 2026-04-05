@@ -3,7 +3,8 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { storage } from "./storage";
 import { createServer } from "http";
-import { setupAuth, registerAuthRoutes } from "./auth";
+import { setupAuth, registerAuthRoutes, bootstrapAdmin } from "./auth";
+import { registerAdminRoutes } from "./adminRoutes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -37,6 +38,7 @@ app.use(express.urlencoded({ extended: false }));
 // Auth (session + passport) — must come after body parsers
 setupAuth(app);
 registerAuthRoutes(app);
+registerAdminRoutes(app);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -119,6 +121,9 @@ app.use((req, res, next) => {
       // but we defer anyway to keep startup non-blocking)
       storage.seedIfEmpty().catch((err) => {
         console.error("Seed failed (non-fatal):", err.message);
+      });
+      bootstrapAdmin().catch((err) => {
+        console.error("Admin bootstrap failed (non-fatal):", err.message);
       });
     },
   );

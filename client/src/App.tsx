@@ -9,6 +9,7 @@ import ListingDetail from "@/pages/ListingDetail";
 import Saved from "@/pages/Saved";
 import ListProperty from "@/pages/ListProperty";
 import VerifyEmail from "@/pages/VerifyEmail";
+import AdminDashboard from "@/pages/AdminDashboard";
 import NotFound from "@/pages/not-found";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -17,7 +18,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import AuthModal from "@/components/AuthModal";
 import { useState } from "react";
-import { Building2, MailCheck } from "lucide-react";
+import { Building2, MailCheck, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // ── /list-property gate ───────────────────────────────────────────────────────
@@ -25,6 +26,20 @@ import { Button } from "@/components/ui/button";
 //   1. Not logged in / not an agent → register CTA
 //   2. Agent but unverified          → verify-email wall
 //   3. Agent + verified              → form
+// -- /admin gate --
+function AdminRoute() {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (user?.role === "admin") return <AdminDashboard />;
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 px-4 text-center">
+      <ShieldAlert className="w-12 h-12 text-destructive opacity-60" />
+      <h2 className="text-xl font-bold">Accès réservé aux administrateurs</h2>
+      <p className="text-muted-foreground max-w-sm">Vous n avez pas les droits pour accéder à cette page.</p>
+    </div>
+  );
+}
+
 function AgentOnlyRoute() {
   const { user, loading, resendVerification } = useAuth();
   const [modal, setModal] = useState(false);
@@ -109,6 +124,7 @@ export default function App() {
                   <Route path="/saved" component={Saved} />
                   <Route path="/list-property" component={AgentOnlyRoute} />
                   <Route path="/verify" component={VerifyEmail} />
+                  <Route path="/admin" component={AdminRoute} />
                   <Route component={NotFound} />
                 </Switch>
               </main>

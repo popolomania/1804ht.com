@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Heart, Moon, Sun, Menu, X, LogOut, User, Building2, ChevronDown } from "lucide-react";
+import { Heart, Moon, Sun, Menu, X, LogOut, User, Building2, ChevronDown, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/ThemeProvider";
 import { useState } from "react";
@@ -115,14 +115,18 @@ export default function Navbar() {
                         <p className="text-xs text-muted-foreground font-normal truncate">{user.email}</p>
                         <span
                           className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                            user.role === "agent" && user.emailVerified
+                            user.role === "admin"
+                              ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+                              : user.role === "agent" && user.emailVerified
                               ? "bg-primary/15 text-primary"
                               : user.role === "agent" && !user.emailVerified
                               ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
                               : "bg-muted text-muted-foreground"
                           }`}
                         >
-                          {user.role === "agent" && !user.emailVerified
+                          {user.role === "admin"
+                            ? "🛡️ Administrateur"
+                            : user.role === "agent" && !user.emailVerified
                             ? "⚠ Email non vérifié"
                             : user.role === "agent"
                             ? "Agent / Propriétaire"
@@ -130,7 +134,15 @@ export default function Navbar() {
                         </span>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      {user.role === "agent" && (
+                      {user.role === "admin" && (
+                        <Link href="/admin">
+                          <DropdownMenuItem>
+                            <ShieldAlert className="w-4 h-4 mr-2" />
+                            Tableau de bord admin
+                          </DropdownMenuItem>
+                        </Link>
+                      )}
+                      {user.role === "agent" && user.emailVerified && (
                         <Link href="/list-property">
                           <DropdownMenuItem>
                             <Building2 className="w-4 h-4 mr-2" />
@@ -215,8 +227,18 @@ export default function Navbar() {
                 <>
                   <div className="px-2 py-1">
                     <p className="text-sm font-medium">{user.name}</p>
-                    <p className="text-xs text-muted-foreground">{user.role === "agent" ? "Agent / Propriétaire" : "Visiteur"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {user.role === "admin" ? "🛡️ Administrateur" : user.role === "agent" ? "Agent / Propriétaire" : "Visiteur"}
+                    </p>
                   </div>
+                  {user.role === "admin" && (
+                    <Link href="/admin" onClick={() => setMenuOpen(false)}>
+                      <Button variant="ghost" className="w-full justify-start text-sm">
+                        <ShieldAlert className="w-4 h-4 mr-2" />
+                        Tableau de bord admin
+                      </Button>
+                    </Link>
+                  )}
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-sm text-destructive hover:text-destructive"

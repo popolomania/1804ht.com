@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 
-export type UserRole = "guest" | "agent";
+export type UserRole = "guest" | "agent" | "admin";
+export type AccountStatus = "pending" | "approved" | "suspended";
 
 export interface AuthUser {
   id: number;
@@ -9,6 +10,7 @@ export interface AuthUser {
   role: UserRole;
   phone?: string | null;
   emailVerified: boolean;
+  accountStatus: AccountStatus;
 }
 
 interface AuthContextValue {

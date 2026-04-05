@@ -18,14 +18,12 @@ const MemStore = MemoryStore(session);
 function generateToken(): string {
   return crypto.randomBytes(32).toString("hex");
 }
-
 function tokenExpiry(): Date {
   const d = new Date();
   d.setHours(d.getHours() + 24);
   return d;
 }
 
-// Strip sensitive fields before sending to client
 export function safeUser(user: User) {
   const { passwordHash: _, verifyToken: __, ...safe } = user;
   return safe;
@@ -68,7 +66,7 @@ export function setupAuth(app: Express) {
       cookie: {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        maxAge: 7 * 24 * 60 * 60 * 1000,
       },
     })
   );
@@ -76,10 +74,42 @@ export function setupAuth(app: Express) {
   app.use(passport.session());
 }
 
+// ── Bootstrap admin from env ──────────────────────────────────────────────────
+// Set ADMIN_EMAIL + ADMIN_PASSWORD in env to auto-create an admin on startup.
+export async function bootstrapAdmin(): Promise<void> {
+  const email = process.env.ADMIN_EMAIL;
+  const password = process.env.ADMIN_PASSWORD;
+  if (!email || !password) return;
+
+  try {
+    const existing = await db().select().from(users).where(eq(users.email, email));
+    if (existing.length > 0) {
+      // Ensure existing user has admin role
+      if (existing[0].role !== "admin") {
+        await db().update(users).set({ role: "admin", accountStatus: "approved" }).where(eq(users.id, existing[0].id));
+        console.log(`[admin] Promoted ${email} to admin`);
+      }
+      return;
+    }
+    const passwordHash = await bcrypt.hash(password, 12);
+    await db().insert(users).values({
+      name: "Admin",
+      email,
+      passwordHash,
+      role: "admin",
+      emailVerified: true,
+      accountStatus: "approved",
+    });
+    console.log(`[admin] Bootstrap admin created: ${email}`);
+  } catch (e: any) {
+    console.error("[admin] Bootstrap failed:", e.message);
+  }
+}
+
 // ── Auth routes ────────────────────────────────────────────────────────────────
 export function registerAuthRoutes(app: Express) {
 
-  // ── POST /api/auth/register ──────────────────────────────────────────────────
+  // POST /api/auth/register
   app.post("/api/auth/register", async (req: Request, res: Response) => {
     try {
       const parsed = registerSchema.safeParse(req.body);
@@ -88,19 +118,19 @@ export function registerAuthRoutes(app: Express) {
       }
       const { name, email, password, role, phone } = parsed.data;
 
-      // Check duplicate email
       const existing = await db().select().from(users).where(eq(users.email, email));
       if (existing.length > 0) {
         return res.status(409).json({ error: "Cet email est déjà utilisé" });
       }
 
       const passwordHash = await bcrypt.hash(password, 12);
-
-      // Guests are auto-verified; agents must confirm their email
       const isAgent = role === "agent";
+
+      // Guests: auto-verified + approved. Agents: need email verify → then pending admin review.
       const verifyToken = isAgent ? generateToken() : null;
       const verifyTokenExpiry = isAgent ? tokenExpiry() : null;
-      const emailVerified = !isAgent; // guests: true, agents: false until link clicked
+      const emailVerified = !isAgent;
+      const accountStatus = isAgent ? "pending" : "approved";
 
       const rows = await db()
         .insert(users)
@@ -113,23 +143,21 @@ export function registerAuthRoutes(app: Express) {
           emailVerified,
           verifyToken,
           verifyTokenExpiry,
+          accountStatus,
         })
         .returning();
       const user = rows[0];
 
-      // Send verification email to agents (non-blocking — don't fail register)
       if (isAgent && verifyToken) {
         sendVerificationEmail({ to: email, name, token: verifyToken }).catch((err) =>
           console.error("[mailer] Failed to send verification email:", err.message)
         );
       }
 
-      // Auto-login after register
       req.login(user, (err) => {
         if (err) return res.status(500).json({ error: "Erreur de connexion" });
         return res.status(201).json({
           ...safeUser(user),
-          // Tell the client whether to show the verify banner
           pendingVerification: isAgent,
         });
       });
@@ -139,7 +167,7 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  // ── POST /api/auth/login ─────────────────────────────────────────────────────
+  // POST /api/auth/login
   app.post("/api/auth/login", (req: Request, res: Response, next: NextFunction) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -157,57 +185,44 @@ export function registerAuthRoutes(app: Express) {
     })(req, res, next);
   });
 
-  // ── POST /api/auth/logout ────────────────────────────────────────────────────
+  // POST /api/auth/logout
   app.post("/api/auth/logout", (req: Request, res: Response) => {
     req.logout(() => res.json({ ok: true }));
   });
 
-  // ── GET /api/auth/me ─────────────────────────────────────────────────────────
+  // GET /api/auth/me
   app.get("/api/auth/me", (req: Request, res: Response) => {
     if (!req.user) return res.status(401).json({ error: "Non connecté" });
     return res.json(safeUser(req.user as User));
   });
 
-  // ── GET /api/auth/verify/:token ──────────────────────────────────────────────
-  // Clicked from the email link — verifies the token, marks user verified,
-  // then redirects to the app with a ?verified=1 query param.
+  // GET /api/auth/verify/:token
   app.get("/api/auth/verify/:token", async (req: Request, res: Response) => {
     try {
       const { token } = req.params;
-      if (!token || token.length !== 64) {
-        return res.redirect("/#/verify?error=invalid");
-      }
+      if (!token || token.length !== 64) return res.redirect("/#/verify?error=invalid");
 
-      const rows = await db()
-        .select()
-        .from(users)
-        .where(eq(users.verifyToken, token as string));
-
+      const rows = await db().select().from(users).where(eq(users.verifyToken, token as string));
       const user = rows[0];
 
       if (!user) return res.redirect("/#/verify?error=invalid");
       if (user.emailVerified) return res.redirect("/#/verify?error=already");
-
-      // Check expiry
       if (user.verifyTokenExpiry && new Date() > user.verifyTokenExpiry) {
         return res.redirect("/#/verify?error=expired");
       }
 
-      // Mark verified, clear token
+      // Mark email verified; accountStatus stays "pending" — admin still needs to approve
       await db()
         .update(users)
         .set({ emailVerified: true, verifyToken: null, verifyTokenExpiry: null })
         .where(eq(users.id, user.id));
 
-      // Refresh the session if this user is logged in
       if (req.user && (req.user as User).id === user.id) {
         (req.user as any).emailVerified = true;
         (req.user as any).verifyToken = null;
       }
 
-      // Send welcome email (non-blocking)
       sendWelcomeEmail({ to: user.email, name: user.name }).catch(() => {});
-
       return res.redirect("/#/verify?success=1");
     } catch (e) {
       console.error("[verify]", e);
@@ -215,8 +230,7 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  // ── POST /api/auth/resend-verification ──────────────────────────────────────
-  // Logged-in unverified agent requests a new email.
+  // POST /api/auth/resend-verification
   app.post("/api/auth/resend-verification", async (req: Request, res: Response) => {
     const user = req.user as User | undefined;
     if (!user) return res.status(401).json({ error: "Connexion requise" });
@@ -226,16 +240,9 @@ export function registerAuthRoutes(app: Express) {
     try {
       const token = generateToken();
       const expiry = tokenExpiry();
-
-      await db()
-        .update(users)
-        .set({ verifyToken: token, verifyTokenExpiry: expiry })
-        .where(eq(users.id, user.id));
-
-      // Update session object so /me reflects the new token (won't be sent to client)
+      await db().update(users).set({ verifyToken: token, verifyTokenExpiry: expiry }).where(eq(users.id, user.id));
       (req.user as any).verifyToken = token;
       (req.user as any).verifyTokenExpiry = expiry;
-
       await sendVerificationEmail({ to: user.email, name: user.name, token });
       return res.json({ ok: true });
     } catch (e: any) {
@@ -247,21 +254,35 @@ export function registerAuthRoutes(app: Express) {
 
 // ── Guards ────────────────────────────────────────────────────────────────────
 
-// Must be logged in
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.user) return res.status(401).json({ error: "Connexion requise" });
   next();
 }
 
-// Must be a verified agent
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  const user = req.user as User | undefined;
+  if (!user) return res.status(401).json({ error: "Connexion requise" });
+  if (user.role !== "admin") return res.status(403).json({ error: "Accès réservé aux administrateurs" });
+  next();
+}
+
+// Verified email + admin-approved accountStatus
 export function requireAgent(req: Request, res: Response, next: NextFunction) {
   const user = req.user as User | undefined;
   if (!user) return res.status(401).json({ error: "Connexion requise" });
-  if (user.role !== "agent") {
+  if (user.role !== "agent" && user.role !== "admin") {
     return res.status(403).json({ error: "Réservé aux agents / propriétaires" });
   }
-  if (!user.emailVerified) {
+  if (user.role === "agent" && !user.emailVerified) {
     return res.status(403).json({ error: "Vérifiez votre email avant de publier une annonce" });
+  }
+  if (user.role === "agent" && user.accountStatus !== "approved") {
+    return res.status(403).json({
+      error:
+        user.accountStatus === "pending"
+          ? "Votre compte est en attente d'approbation par un administrateur"
+          : "Votre compte a été suspendu — contactez le support",
+    });
   }
   next();
 }
