@@ -11,6 +11,8 @@ export interface AuthUser {
   phone?: string | null;
   emailVerified: boolean;
   accountStatus: AccountStatus;
+  upgradeRequestedAt?: string | null; // ISO string if request submitted
+  upgradeReason?: string | null;
 }
 
 interface AuthContextValue {
@@ -24,6 +26,7 @@ interface AuthContextValue {
   resendVerification: () => Promise<void>;
   /** Call after the user clicks the verify link so the UI updates instantly */
   markVerified: () => void;
+  requestUpgrade: (reason: string, phone?: string) => Promise<void>;
   error: string | null;
   clearError: () => void;
 }
@@ -115,6 +118,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPendingVerification(false);
   }, []);
 
+  const requestUpgrade = useCallback(async (reason: string, phone?: string) => {
+    const r = await fetch("/api/auth/request-upgrade", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ reason, phone }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error ?? "Erreur lors de la demande");
+    // Optimistically mark request as submitted
+    setUser((u) => (u ? { ...u, upgradeRequestedAt: new Date().toISOString() } : u));
+  }, []);
+
   const clearError = useCallback(() => setError(null), []);
 
   return (
@@ -128,6 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         resendVerification,
         markVerified,
+        requestUpgrade,
         error,
         clearError,
       }}

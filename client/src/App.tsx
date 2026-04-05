@@ -14,6 +14,7 @@ import NotFound from "@/pages/not-found";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import VerifyEmailBanner from "@/components/VerifyEmailBanner";
+import UpgradeModal from "@/components/UpgradeModal";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import AuthModal from "@/components/AuthModal";
@@ -85,7 +86,30 @@ function AgentOnlyRoute() {
     );
   }
 
-  // State 1 — not an agent
+  // State 1a — logged-in guest
+  if (user?.role === "guest") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 px-4 text-center">
+        <Building2 className="w-12 h-12 text-primary opacity-60" />
+        <h2 className="text-xl font-bold">Réservé aux agents et propriétaires</h2>
+        <p className="text-muted-foreground max-w-sm">
+          Vous êtes connecté en tant que Visiteur. Demandez le statut Agent pour pouvoir publier des annonces.
+        </p>
+        {user.upgradeRequestedAt ? (
+          <div className="flex items-center gap-2 text-sm text-amber-600 font-medium">
+            <span>⏳ Demande en cours d'examen par un administrateur</span>
+          </div>
+        ) : (
+          <Button onClick={() => setModal(true)}>
+            Devenir Agent / Propriétaire
+          </Button>
+        )}
+        <UpgradeModal open={modal} onClose={() => setModal(false)} />
+      </div>
+    );
+  }
+
+  // State 1b — not logged in
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 px-4 text-center">
       <Building2 className="w-12 h-12 text-primary opacity-60" />

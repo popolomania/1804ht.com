@@ -6,6 +6,7 @@ import { useState } from "react";
 import Logo from "@/components/Logo";
 import { useAuth } from "@/context/AuthContext";
 import AuthModal from "@/components/AuthModal";
+import UpgradeModal from "@/components/UpgradeModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,7 @@ export default function Navbar() {
     open: false,
     mode: "login",
   });
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const { user, logout, loading } = useAuth();
   const { toast } = useToast();
 
@@ -150,6 +152,17 @@ export default function Navbar() {
                           </DropdownMenuItem>
                         </Link>
                       )}
+                      {user.role === "guest" && (
+                        <>
+                          <DropdownMenuItem onClick={() => setUpgradeOpen(true)}>
+                            <Building2 className="w-4 h-4 mr-2" />
+                            {user.upgradeRequestedAt
+                              ? "Demande agent en cours…"
+                              : "Devenir Agent / Propriétaire"}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
                       <Link href="/saved">
                         <DropdownMenuItem>
                           <Heart className="w-4 h-4 mr-2" />
@@ -265,6 +278,7 @@ export default function Navbar() {
       </nav>
 
       <AuthModal open={authModal.open} onClose={closeModal} initialMode={authModal.mode} />
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
     </>
   );
 }

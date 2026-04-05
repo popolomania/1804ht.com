@@ -15,10 +15,15 @@
 import type { Express, Request, Response } from "express";
 import { db } from "./db";
 import { users, listings } from "@shared/schema";
-import { eq, ne, sql, and, or, ilike } from "drizzle-orm";
+import { eq, ne, isNotNull } from "drizzle-orm";
 import { requireAdmin } from "./auth";
+import { sendVerificationEmail } from "./mailer";
 import type { User } from "@shared/schema";
 import { z } from "zod";
+import crypto from "crypto";
+
+function generateToken() { return crypto.randomBytes(32).toString("hex"); }
+function tokenExpiry() { const d = new Date(); d.setHours(d.getHours() + 24); return d; }
 
 export function registerAdminRoutes(app: Express) {
 
@@ -41,6 +46,7 @@ export function registerAdminRoutes(app: Express) {
           suspended: allUsers.filter((u) => u.role === "agent" && u.accountStatus === "suspended").length,
           unverifiedEmail: allUsers.filter((u) => u.role === "agent" && !u.emailVerified).length,
         },
+        upgradeRequests: allUsers.filter((u) => u.role === "guest" && u.upgradeRequestedAt !== null).length,
         listings: {
           total: allListings.length,
           active: allListings.filter((l) => l.status === "active").length,
@@ -58,6 +64,73 @@ export function registerAdminRoutes(app: Express) {
   // ── GET /api/admin/agents ──────────────────────────────────────────────────
   // ?status=pending|approved|suspended|all   (default: all)
   // ?q=search term (name or email)
+
+  // -- GET /api/admin/upgrade-requests --
+  app.get("/api/admin/upgrade-requests", requireAdmin, async (_req: Request, res: Response) => {
+    try {
+      const rows = await db().select().from(users).where(isNotNull(users.upgradeRequestedAt));
+      rows.sort((a, b) => (b.upgradeRequestedAt?.getTime() ?? 0) - (a.upgradeRequestedAt?.getTime() ?? 0));
+      const safe = rows.map(({ passwordHash: _, verifyToken: __, ...u }) => u);
+      res.json(safe);
+    } catch (e) {
+      res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  // -- POST /api/admin/users/:id/upgrade --
+  const upgradeActionSchema = z.object({ action: z.enum(["approve", "reject"]) });
+
+  app.post("/api/admin/users/:id/upgrade", requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
+      const parsed = upgradeActionSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "Action invalide (approve | reject)" });
+
+      const admin = req.user as User;
+      const target = (await db().select().from(users).where(eq(users.id, id)))[0];
+      if (!target) return res.status(404).json({ error: "Utilisateur introuvable" });
+      if (target.role !== "guest") return res.status(400).json({ error: "Cet utilisateur n\'est pas un visiteur" });
+
+      if (parsed.data.action === "reject") {
+        const updated = await db()
+          .update(users)
+          .set({ upgradeRequestedAt: null, upgradeReason: null, reviewedAt: new Date(), reviewedBy: admin.id })
+          .where(eq(users.id, id))
+          .returning();
+        const { passwordHash: _, verifyToken: __, ...safe } = updated[0];
+        return res.json({ ...safe, action: "rejected" });
+      }
+
+      // approve: promote to agent, issue verify token, send email
+      const token = generateToken();
+      const expiry = tokenExpiry();
+      const updated = await db()
+        .update(users)
+        .set({
+          role: "agent",
+          accountStatus: "pending",
+          emailVerified: false,
+          verifyToken: token,
+          verifyTokenExpiry: expiry,
+          upgradeRequestedAt: null,
+          upgradeReason: null,
+          reviewedAt: new Date(),
+          reviewedBy: admin.id,
+        })
+        .where(eq(users.id, id))
+        .returning();
+
+      sendVerificationEmail({ to: target.email, name: target.name, token })
+        .catch((err: any) => console.error("[upgrade mailer]", err.message));
+
+      const { passwordHash: _, verifyToken: __, ...safe } = updated[0];
+      return res.json({ ...safe, action: "approved" });
+    } catch (e: any) {
+      console.error("[admin/upgrade]", e.message);
+      res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
   app.get("/api/admin/agents", requireAdmin, async (req: Request, res: Response) => {
     try {
       const status = (req.query.status as string) || "all";

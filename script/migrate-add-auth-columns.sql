@@ -25,4 +25,8 @@ UPDATE users SET account_status = 'approved'
 UPDATE users SET email_verified = true
   WHERE role = 'guest' AND email_verified = false;
 
+-- 6. Guest-to-agent upgrade request fields (added in feat/guest-upgrade)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS upgrade_requested_at TIMESTAMP;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS upgrade_reason TEXT;
+
 SELECT 'Migration complete.' AS status;

@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Users, Building2, CheckCircle, XCircle, Clock, ShieldAlert,
-  Search, RefreshCw, Trash2, Eye, ChevronDown, ChevronUp,
-  MailCheck, AlertTriangle, Home, Ban, BarChart3,
+  Users, Building2, CheckCircle, Clock, ShieldAlert,
+  Search, Trash2, ChevronDown, ChevronUp,
+  MailCheck, Home, Ban, ArrowUpCircle, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,8 @@ interface AdminUser {
   adminNotes: string | null;
   createdAt: string | null;
   reviewedAt: string | null;
+  upgradeRequestedAt: string | null;
+  upgradeReason: string | null;
 }
 
 interface AdminListing {
@@ -44,6 +46,7 @@ interface AdminListing {
 interface Stats {
   users: { total: number; guests: number; agents: number; admins: number };
   agents: { pending: number; approved: number; suspended: number; unverifiedEmail: number };
+  upgradeRequests: number;
   listings: { total: number; active: number; pending: number; sold: number };
 }
 
@@ -104,6 +107,15 @@ export default function AdminDashboard() {
     },
   });
 
+  const { data: upgradeRequests = [], isLoading: upgradeLoading } = useQuery<AdminUser[]>({
+    queryKey: ["/api/admin/upgrade-requests"],
+    queryFn: async (): Promise<AdminUser[]> => {
+      const r = await apiRequest("GET", "/api/admin/upgrade-requests");
+      return r.json() as Promise<AdminUser[]>;
+    },
+    refetchInterval: 30_000,
+  });
+
   const { data: adminListings = [], isLoading: listingsLoading } = useQuery<AdminListing[]>({
     queryKey: ["/api/admin/listings", listingFilter, listingSearch],
     queryFn: async (): Promise<AdminListing[]> => {
@@ -149,6 +161,19 @@ export default function AdminDashboard() {
       qc.invalidateQueries({ queryKey: ["/api/admin/agents"] });
       qc.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       toast({ title: "Utilisateur supprimé" });
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  const handleUpgrade = useMutation({
+    mutationFn: async ({ id, action }: { id: number; action: "approve" | "reject" }) => {
+      const r = await apiRequest("POST", `/api/admin/users/${id}/upgrade`, { action });
+      return r.json();
+    },
+    onSuccess: (_, { action }) => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/upgrade-requests"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({ title: action === "approve" ? "Demande approuvée — email de vérification envoyé" : "Demande refusée" });
     },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
@@ -225,6 +250,14 @@ export default function AdminDashboard() {
             color="green"
           />
           <StatCard
+            icon={<ArrowUpCircle className="w-5 h-5" />}
+            label="Demandes upgrade"
+            value={stats.upgradeRequests}
+            sub="Visiteurs → Agent"
+            color={stats.upgradeRequests > 0 ? "purple" : "muted"}
+            pulse={stats.upgradeRequests > 0}
+          />
+          <StatCard
             icon={<Building2 className="w-5 h-5" />}
             label="Annonces"
             value={stats.listings.total}
@@ -243,6 +276,15 @@ export default function AdminDashboard() {
             {stats?.agents.pending ? (
               <span className="ml-1 bg-amber-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">
                 {stats.agents.pending}
+              </span>
+            ) : null}
+          </TabsTrigger>
+          <TabsTrigger value="upgrades" className="flex items-center gap-2">
+            <ArrowUpCircle className="w-4 h-4" />
+            Upgrades
+            {(stats?.upgradeRequests ?? 0) > 0 ? (
+              <span className="ml-1 bg-purple-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">
+                {stats!.upgradeRequests}
               </span>
             ) : null}
           </TabsTrigger>
@@ -311,6 +353,74 @@ export default function AdminDashboard() {
                   onSaveNotes={() => saveNotes.mutate({ id: agent.id, notes: editingNotes[agent.id] ?? "" })}
                   busy={updateStatus.isPending || saveNotes.isPending || deleteUser.isPending}
                 />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── UPGRADES TAB ── */}
+        <TabsContent value="upgrades">
+          {upgradeLoading ? (
+            <div className="space-y-3">
+              {[...Array(2)].map((_, i) => <div key={i} className="h-24 rounded-lg bg-muted animate-pulse" />)}
+            </div>
+          ) : upgradeRequests.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">
+              <ArrowUpCircle className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p>Aucune demande de passage en mode Agent.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {upgradeRequests.map((u) => (
+                <div key={u.id} className="rounded-xl border bg-card p-4">
+                  <div className="flex items-start gap-3">
+                    {/* Avatar */}
+                    <div className="w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-sm font-bold text-purple-700 dark:text-purple-300 shrink-0">
+                      {u.name[0].toUpperCase()}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        <span className="font-medium text-sm">{u.name}</span>
+                        <span className="text-xs text-muted-foreground">{u.email}</span>
+                        {u.phone && <span className="text-xs text-muted-foreground">· {u.phone}</span>}
+                        <span className="text-[10px] text-muted-foreground ml-auto">
+                          Demandé le {fmtDate(u.upgradeRequestedAt)}
+                        </span>
+                      </div>
+
+                      {/* Reason */}
+                      <div className="mt-2 rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                        <p className="text-[10px] font-semibold text-foreground/50 mb-0.5">MOTIF</p>
+                        <p>{u.upgradeReason ?? <em>Non spécifié</em>}</p>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 mt-3">
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => handleUpgrade.mutate({ id: u.id, action: "approve" })}
+                          disabled={handleUpgrade.isPending}
+                        >
+                          <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                          Approuver — passer en Agent
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => handleUpgrade.mutate({ id: u.id, action: "reject" })}
+                          disabled={handleUpgrade.isPending}
+                        >
+                          <X className="w-3.5 h-3.5 mr-1" />
+                          Refuser
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -442,7 +552,7 @@ function StatCard({
   label: string;
   value: number;
   sub: string;
-  color: "teal" | "amber" | "green" | "blue" | "muted";
+  color: "teal" | "amber" | "green" | "blue" | "purple" | "muted";
   pulse?: boolean;
 }) {
   const colorMap = {
@@ -450,6 +560,7 @@ function StatCard({
     amber: "text-amber-600 bg-amber-50 dark:bg-amber-900/20",
     green: "text-green-600 bg-green-50 dark:bg-green-900/20",
     blue: "text-blue-600 bg-blue-50 dark:bg-blue-900/20",
+    purple: "text-purple-600 bg-purple-50 dark:bg-purple-900/20",
     muted: "text-muted-foreground bg-muted/50",
   };
   return (

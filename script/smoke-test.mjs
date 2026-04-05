@@ -576,6 +576,126 @@ async function testAuthAgentApprovalFlow() {
   }
 }
 
+
+async function testGuestUpgradeFlow() {
+  log("AUTH — GUEST TO AGENT UPGRADE FLOW");
+
+  const ts            = Date.now();
+  const UPGRADE_EMAIL = `smoke-upgrade-${ts}@test.invalid`;
+  const UPGRADE_PASS  = "UpgradePass123";
+  const ADMIN_EMAIL    = process.env.ADMIN_EMAIL    || "admin@1804ht.com";
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "smoke-admin-pass";
+
+  const upgradeJar = {};
+  const adminJar2  = {};
+
+  // Register as guest
+  const reg = await req("POST", "/api/auth/register", {
+    name: "Smoke Upgrade Guest",
+    email: UPGRADE_EMAIL,
+    password: UPGRADE_PASS,
+    role: "guest",
+  }, upgradeJar);
+  ok("Upgrade: register as guest → 201", reg.status === 201);
+  ok("Upgrade: guest is auto-approved", reg.body?.accountStatus === "approved");
+  const upgradeUserId = reg.body?.id;
+
+  // Duplicate request (none yet, so should succeed)
+  const req1 = await req("POST", "/api/auth/request-upgrade", {
+    reason: "Je suis agent immobilier à Cap-Haïtien depuis 5 ans.",
+  }, upgradeJar);
+  ok("Upgrade: submit upgrade request → 200", req1.status === 200);
+  ok("Upgrade: response ok:true", req1.body?.ok === true);
+
+  // Duplicate request should be rejected
+  const req2 = await req("POST", "/api/auth/request-upgrade", {
+    reason: "Duplicate request — should fail.",
+  }, upgradeJar);
+  ok("Upgrade: duplicate request → 409", req2.status === 409);
+
+  // Non-guest cannot request upgrade
+  const badJar = {};
+  await req("POST", "/api/auth/register", {
+    name: "Smoke Agent2",
+    email: `smoke-agent2-${ts}@test.invalid`,
+    password: "Pass123!",
+    role: "agent",
+  }, badJar);
+  const agentUpgrade = await req("POST", "/api/auth/request-upgrade", {
+    reason: "Agent trying to upgrade again",
+  }, badJar);
+  ok("Upgrade: agent cannot request upgrade → 400", agentUpgrade.status === 400);
+
+  // Unauthenticated request
+  const unauth = await req("POST", "/api/auth/request-upgrade", { reason: "no session" });
+  ok("Upgrade: unauthenticated request → 401", unauth.status === 401);
+
+  // Admin handles the request
+  const adminLogin2 = await req("POST", "/api/auth/login", {
+    email: ADMIN_EMAIL, password: ADMIN_PASSWORD,
+  }, adminJar2);
+  const adminOk = adminLogin2.status === 200 && adminLogin2.body?.role === "admin";
+  ok("Upgrade: admin login → 200", adminOk);
+
+  if (adminOk && upgradeUserId) {
+    // Check upgrade-requests list
+    const list = await req("GET", "/api/admin/upgrade-requests", undefined, adminJar2);
+    ok("Upgrade: GET /api/admin/upgrade-requests → 200", list.status === 200);
+    ok("Upgrade: list includes the guest", Array.isArray(list.body) && list.body.some(u => u.email === UPGRADE_EMAIL));
+
+    // Admin approves
+    const approve = await req("POST", `/api/admin/users/${upgradeUserId}/upgrade`,
+      { action: "approve" }, adminJar2);
+    ok("Upgrade: admin approve → 200", approve.status === 200);
+    ok("Upgrade: role changed to agent", approve.body?.role === "agent");
+    ok("Upgrade: accountStatus=pending", approve.body?.accountStatus === "pending");
+    ok("Upgrade: emailVerified=false (needs verify)", approve.body?.emailVerified === false);
+    ok("Upgrade: upgradeRequestedAt cleared", approve.body?.upgradeRequestedAt === null);
+    ok("Upgrade: action=approved in response", approve.body?.action === "approved");
+
+    // Non-guest cannot be upgraded
+    const badUpgrade = await req("POST", `/api/admin/users/${approve.body?.id}/upgrade`,
+      { action: "approve" }, adminJar2);
+    ok("Upgrade: upgrade non-guest → 400", badUpgrade.status === 400);
+
+    // Reject flow — register another guest and reject them
+    const rejectJar = {};
+    const rejectReg = await req("POST", "/api/auth/register", {
+      name: "Smoke Reject Guest",
+      email: `smoke-reject-${ts}@test.invalid`,
+      password: "RejectPass123",
+      role: "guest",
+    }, rejectJar);
+    await req("POST", "/api/auth/request-upgrade", {
+      reason: "I want to be an agent but will be rejected.",
+    }, rejectJar);
+
+    const rejectId = rejectReg.body?.id;
+    const reject = await req("POST", `/api/admin/users/${rejectId}/upgrade`,
+      { action: "reject" }, adminJar2);
+    ok("Upgrade: admin reject → 200", reject.status === 200);
+    ok("Upgrade: role stays guest after reject", reject.body?.role === "guest");
+    ok("Upgrade: upgradeRequestedAt cleared after reject", reject.body?.upgradeRequestedAt === null);
+    ok("Upgrade: action=rejected in response", reject.body?.action === "rejected");
+
+    // Cleanup reject guest
+    await req("DELETE", `/api/admin/users/${rejectId}`, undefined, adminJar2);
+
+    // Cleanup agent2 (was registered above)
+    const agentList = await req("GET", `/api/admin/agents?status=all`, undefined, adminJar2);
+    if (Array.isArray(agentList.body)) {
+      const agent2 = agentList.body.find(u => u.email === `smoke-agent2-${ts}@test.invalid`);
+      if (agent2) await req("DELETE", `/api/admin/users/${agent2.id}`, undefined, adminJar2);
+    }
+
+    // Cleanup upgraded user (now an agent)
+    await req("DELETE", `/api/admin/users/${upgradeUserId}`, undefined, adminJar2);
+  } else {
+    const skips = 12;
+    for (let i = 0; i < skips; i++) ok("(skipped — admin not available)", false);
+  }
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 checkDatabaseUrl();
@@ -605,6 +725,7 @@ await testReadPath();
 await testWritePath();
 await testSavedPath();
 await testAuthAgentApprovalFlow();
+await testGuestUpgradeFlow();
 
 cleanup();
 

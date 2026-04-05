@@ -24,6 +24,9 @@ export const users = pgTable("users", {
   adminNotes: text("admin_notes"),           // internal notes by admin
   reviewedAt: timestamp("reviewed_at"),      // when admin last acted on the account
   reviewedBy: integer("reviewed_by"),        // admin user id
+  // Guest → Agent upgrade request
+  upgradeRequestedAt: timestamp("upgrade_requested_at"),
+  upgradeReason: text("upgrade_reason"),     // why the guest wants to become an agent
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -37,6 +40,11 @@ export const registerSchema = z.object({
 });
 
 export type AccountStatus = "pending" | "approved" | "suspended";
+
+export const upgradeRequestSchema = z.object({
+  reason: z.string().min(10, "Veuillez expliquer pourquoi vous souhaitez devenir agent (10 caractères min.)").max(500),
+  phone: z.string().optional(),
+});
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),

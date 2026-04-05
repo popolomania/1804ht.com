@@ -8,7 +8,7 @@ import { db } from "./db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import type { User } from "@shared/schema";
-import { registerSchema, loginSchema } from "@shared/schema";
+import { registerSchema, loginSchema, upgradeRequestSchema } from "@shared/schema";
 import MemoryStore from "memorystore";
 import { sendVerificationEmail, sendWelcomeEmail } from "./mailer";
 
@@ -229,6 +229,54 @@ export function registerAuthRoutes(app: Express) {
     } catch (e) {
       console.error("[verify]", e);
       return res.redirect("/#/verify?error=server");
+    }
+  });
+
+  // ── POST /api/auth/request-upgrade ─────────────────────────────────────────
+  // Logged-in guest requests promotion to Agent.
+  // Sets upgradeRequestedAt + upgradeReason so admins see it in the queue.
+  app.post("/api/auth/request-upgrade", async (req: Request, res: Response) => {
+    const user = req.user as User | undefined;
+    if (!user) return res.status(401).json({ error: "Connexion requise" });
+    if (user.role !== "guest") {
+      return res.status(400).json({
+        error: user.role === "agent"
+          ? "Vous êtes déjà agent"
+          : "Action non disponible pour ce rôle",
+      });
+    }
+
+    const parsed = upgradeRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.errors[0].message });
+    }
+    const { reason, phone } = parsed.data;
+
+    try {
+      // Prevent duplicate requests
+      if (user.upgradeRequestedAt) {
+        return res.status(409).json({
+          error: "Vous avez déjà soumis une demande de passage en mode Agent. Un administrateur va l'examiner bientôt.",
+        });
+      }
+
+      const updated = await db()
+        .update(users)
+        .set({
+          upgradeRequestedAt: new Date(),
+          upgradeReason: reason,
+          ...(phone ? { phone } : {}),
+        })
+        .where(eq(users.id, user.id))
+        .returning();
+
+      // Refresh session
+      Object.assign(req.user as object, updated[0]);
+
+      return res.json({ ok: true, message: "Votre demande a été soumise. Un administrateur vous contactera bientôt." });
+    } catch (e: any) {
+      console.error("[request-upgrade]", e.message);
+      return res.status(500).json({ error: "Erreur serveur" });
     }
   });
 
