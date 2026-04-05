@@ -85,7 +85,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify(form),
     });
     const data = await r.json();
-    if (!r.ok) throw new Error(data.error ?? "Erreur d'inscription");
+    if (!r.ok) {
+      const msg = data.detail ? `${data.error}: ${data.detail}` : (data.error ?? "Erreur d'inscription");
+      throw new Error(msg);
+    }
     setUser(data);
     if (data.pendingVerification) {
       setPendingVerification(true);

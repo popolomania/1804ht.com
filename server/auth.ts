@@ -162,8 +162,10 @@ export function registerAuthRoutes(app: Express) {
         });
       });
     } catch (e: any) {
-      console.error("[register]", e);
-      res.status(500).json({ error: "Erreur serveur" });
+      console.error("[register] ERROR:", e?.message ?? e);
+      // In dev surface the real DB error so it's visible in the browser console
+      const detail = process.env.NODE_ENV !== "production" ? e?.message : undefined;
+      res.status(500).json({ error: "Erreur serveur", detail });
     }
   });
 
