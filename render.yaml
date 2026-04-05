@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: 1804ht
+    runtime: node
+    buildCommand: npm ci && npm run build
+    # migrate runs db:push before the server boots — idempotent and safe.
+    # If migration fails the deploy is aborted before any traffic hits a broken schema.
+    startCommand: npm run migrate && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false        # injected by Render Postgres add-on or set manually
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: APP_URL
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false

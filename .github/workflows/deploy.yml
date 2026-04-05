@@ -1,4 +1,4 @@
-name: Deploy to Railway
+name: CI & Deploy to Render
 
 on:
   push:
@@ -6,9 +6,35 @@ on:
       - master
 
 jobs:
-  smoke-and-deploy:
-    name: Smoke Test & Deploy
+  # ── Job 1: type-check + build ─────────────────────────────────────────────
+  ci:
+    name: Type Check & Build
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run check
+
+      - name: Build
+        run: npm run build
+
+  # ── Job 2: smoke test against a real Postgres ─────────────────────────────
+  smoke:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    needs: ci   # only run if build passes
 
     services:
       postgres:
@@ -44,13 +70,49 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Push schema to test DB
-        run: npm run db:push
+      - name: Run migration (db:push) against test DB
+        run: npm run migrate
 
       - name: Smoke test
         run: npm run smoke
 
-      - name: Deploy to Railway
-        uses: railwayapp/deploy-action@v1
-        with:
-          railway-token: ${{ secrets.RAILWAY_TOKEN }}
+  # ── Job 3: trigger Render deploy ─────────────────────────────────────────
+  # Render re-deploys on push automatically when the repo is connected.
+  # This job *additionally* fires the deploy hook so you can also trigger
+  # it manually (workflow_dispatch) or confirm it ran in the Actions log.
+  #
+  # To enable:
+  #   1. Go to Render dashboard → your web service → Settings → Deploy Hook
+  #   2. Copy the hook URL
+  #   3. Add it as a GitHub secret: Settings → Secrets → RENDER_DEPLOY_HOOK_URL
+  #
+  # The hook URL already contains the auth token — no extra secret needed.
+  # If RENDER_DEPLOY_HOOK_URL is not set this step is skipped (not failed).
+  deploy:
+    name: Trigger Render Deploy
+    runs-on: ubuntu-latest
+    needs: smoke   # only deploy after smoke tests pass
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Trigger Render deploy hook
+        if: ${{ secrets.RENDER_DEPLOY_HOOK_URL != '' }}
+        run: |
+          echo "Triggering Render deploy..."
+          STATUS=$(curl -s -o /tmp/render_resp.json -w "%{http_code}" \
+            -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+          cat /tmp/render_resp.json
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]; then
+            echo "Deploy triggered successfully (HTTP $STATUS)"
+          else
+            echo "Deploy hook returned HTTP $STATUS — check Render dashboard"
+            exit 1
+          fi
+
+      - name: Skip (RENDER_DEPLOY_HOOK_URL not configured)
+        if: ${{ secrets.RENDER_DEPLOY_HOOK_URL == '' }}
+        run: |
+          echo "RENDER_DEPLOY_HOOK_URL secret is not set."
+          echo "Render will still auto-deploy from the GitHub push."
+          echo "To also confirm deploy in Actions, add the secret from:"
+          echo "Render dashboard → your service → Settings → Deploy Hook"
