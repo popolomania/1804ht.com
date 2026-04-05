@@ -42,8 +42,8 @@ export default function Navbar() {
     { href: "/saved", label: "Favoris" },
   ];
 
-  // "Publier" is only shown to logged-in agents
-  const canPublish = user?.role === "agent";
+  // "Publier" is only shown to verified agents
+  const canPublish = user?.role === "agent" && user.emailVerified;
 
   return (
     <>
@@ -115,12 +115,18 @@ export default function Navbar() {
                         <p className="text-xs text-muted-foreground font-normal truncate">{user.email}</p>
                         <span
                           className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                            user.role === "agent"
+                            user.role === "agent" && user.emailVerified
                               ? "bg-primary/15 text-primary"
+                              : user.role === "agent" && !user.emailVerified
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
                               : "bg-muted text-muted-foreground"
                           }`}
                         >
-                          {user.role === "agent" ? "Agent / Propriétaire" : "Visiteur"}
+                          {user.role === "agent" && !user.emailVerified
+                            ? "⚠ Email non vérifié"
+                            : user.role === "agent"
+                            ? "Agent / Propriétaire"
+                            : "Visiteur"}
                         </span>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />

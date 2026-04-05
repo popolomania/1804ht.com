@@ -11,6 +11,10 @@ export const users = pgTable("users", {
   // "guest" = browse only, "agent" = can list/edit/delete own listings
   role: text("role").notNull().default("guest"),
   phone: text("phone"),
+  // Email verification
+  emailVerified: boolean("email_verified").notNull().default(false),
+  verifyToken: text("verify_token"),         // hex token, null once used
+  verifyTokenExpiry: timestamp("verify_token_expiry"), // expires 24 h after issue
   createdAt: timestamp("created_at").defaultNow(),
 });
 
