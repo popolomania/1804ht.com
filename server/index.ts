@@ -41,6 +41,38 @@ setupAuth(app);
 registerAuthRoutes(app);
 registerAdminRoutes(app);
 
+// Health check — shows DB status and schema state without leaking secrets
+app.get("/api/health", async (_req, res) => {
+  const checks: Record<string, string> = {};
+  checks.server = "ok";
+  checks.nodeEnv = process.env.NODE_ENV ?? "unset";
+  checks.databaseUrl = process.env.DATABASE_URL
+    ? "set (" + process.env.DATABASE_URL.replace(/:([^@]+)@/, ":***@") + ")"
+    : "MISSING";
+
+  try {
+    const { db } = await import("./db");
+    const result = await db().execute(
+      (await import("drizzle-orm/sql")).sql`SELECT 1 as ok`
+    );
+    checks.db = "connected";
+    // Quick schema check
+    const cols = await db().execute(
+      (await import("drizzle-orm/sql")).sql`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'users'
+        ORDER BY column_name
+      `
+    );
+    checks.usersColumns = (cols as any[]).map((r: any) => r.column_name).join(", ") || "table missing";
+  } catch (e: any) {
+    checks.db = "ERROR: " + e.message;
+  }
+
+  const allOk = checks.db === "connected" && checks.databaseUrl !== "MISSING";
+  res.status(allOk ? 200 : 503).json(checks);
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
