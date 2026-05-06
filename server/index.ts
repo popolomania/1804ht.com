@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { createServer } from "http";
 import { setupAuth, registerAuthRoutes, bootstrapAdmin } from "./auth";
 import { registerAdminRoutes } from "./adminRoutes";
+import { runMigrations } from "./migrate";
 
 const app = express();
 const httpServer = createServer(app);
@@ -78,6 +79,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Run DB migrations FIRST — before routes, seeds, or anything else.
+  // Uses only the 'postgres' prod dependency; no drizzle-kit needed.
+  await runMigrations();
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

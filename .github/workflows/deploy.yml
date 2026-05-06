@@ -75,10 +75,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Run migration (db:push) against test DB
-        run: npm run migrate
-
-      - name: Smoke test (includes agent approval flow)
+      - name: Smoke test (migrations run automatically inside server startup)
         run: npm run smoke
 
   # ── Job 3: trigger Render deploy ─────────────────────────────────────────

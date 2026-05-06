@@ -3,9 +3,9 @@ services:
     name: 1804ht
     runtime: node
     buildCommand: npm ci && npm run build
-    # migrate runs db:push before the server boots — idempotent and safe.
-    # If migration fails the deploy is aborted before any traffic hits a broken schema.
-    startCommand: npm run migrate && npm start
+    # Migration runs automatically inside the server on startup (server/migrate.ts).
+    # No separate migrate step needed — uses only production dependencies.
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
