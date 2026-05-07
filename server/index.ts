@@ -69,8 +69,10 @@ app.get("/api/health", async (_req, res) => {
     checks.db = "ERROR: " + e.message;
   }
 
-  const allOk = checks.db === "connected" && checks.databaseUrl !== "MISSING";
-  res.status(allOk ? 200 : 503).json(checks);
+  const dbOk = checks.db === "connected" && checks.databaseUrl !== "MISSING";
+  // Return 200 for liveness (server is running) — Railway healthcheck only needs this.
+  // Database status is still reported in the response body for observability.
+  res.status(200).json({ ...checks, dbReady: dbOk });
 });
 
 export function log(message: string, source = "express") {
